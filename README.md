@@ -48,7 +48,7 @@ or your `capacitor.config.json` file
 {
   plugins: {
     Chromecast: {
-      receiverApplicationId: "YOUR_RECEIVER_APPLICATION_ID",
+      receiverApplicationId: "YOUR_RECEIVER_APPLICATION_ID"
     }
   }
 }
