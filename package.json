@@ -1,7 +1,7 @@
 {
   "name": "capacitor-chromecast",
   "version": "0.1.0",
-  "description": "Capacitor 8 plugin for the native Google Cast device picker on Android and iOS",
+  "description": "Open the native Google Cast device picker from Capacitor",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
