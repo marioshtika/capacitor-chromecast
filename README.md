@@ -44,7 +44,7 @@ export default CapacitorConfig({
 });
 ```
 or your `capacitor.config.json` file
-```json
+```typescript
 {
   plugins: {
     Chromecast: {
