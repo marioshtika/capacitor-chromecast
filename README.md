@@ -46,11 +46,10 @@ export default CapacitorConfig({
 or your `capacitor.config.json` file
 ```json
 {
-  ...
   plugins: {
     Chromecast: {
       receiverApplicationId: "YOUR_RECEIVER_APPLICATION_ID",
-    },
+    }
   }
 }
 ```
