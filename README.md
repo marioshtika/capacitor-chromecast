@@ -68,11 +68,15 @@ await Chromecast.initialize({
   receiverApplicationId: 'YOUR_RECEIVER_APPLICATION_ID',
 });
 
-await Chromecast.show();
-
-await Chromecast.loadMedia({
-  url: 'https://example.com/video.mp4',
+await Chromecast.addListener('sessionStateChanged', async (event) => {
+  if (event.state === 'connected') {
+    await Chromecast.loadMedia({
+      url: 'https://example.com/video.mp4',
+    });
+  }
 });
+
+await Chromecast.show();
 ```
 
 ## iOS setup
