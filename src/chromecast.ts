@@ -1,12 +1,13 @@
 import { registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
-import type { ChromecastPlugin, InitializeOptions, SessionStateChangedEvent } from './definitions.js';
+import type { ChromecastPlugin, InitializeOptions, LoadMediaOptions, SessionStateChangedEvent } from './definitions.js';
 import { normalizeReceiverApplicationId } from './errors.js';
 
 type NativeChromecastPlugin = {
   initialize(options: InitializeOptions): Promise<void>;
   show(): Promise<void>;
+  loadMedia(options: LoadMediaOptions): Promise<void>;
   addListener(
     eventName: 'sessionStateChanged',
     listenerFunc: (event: SessionStateChangedEvent) => void,
@@ -54,6 +55,10 @@ export class ChromecastClient implements ChromecastPlugin {
 
   async show(): Promise<void> {
     await this.plugin.show();
+  }
+
+  async loadMedia(options: LoadMediaOptions): Promise<void> {
+    await this.plugin.loadMedia(options);
   }
 
   addListener(

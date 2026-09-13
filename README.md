@@ -32,6 +32,7 @@ await Chromecast.initialize({
 ### Capacitor config initialization
 
 You can either modify your `capacitor.config.ts` file
+
 ```typescript
 import { CapacitorConfig } from '@capacitor/cli';
 
@@ -43,12 +44,14 @@ export default CapacitorConfig({
   },
 });
 ```
+
 or your `capacitor.config.json` file
-```typescript
+
+```json
 {
-  plugins: {
-    Chromecast: {
-      receiverApplicationId: "YOUR_RECEIVER_APPLICATION_ID"
+  "plugins": {
+    "Chromecast": {
+      "receiverApplicationId": "YOUR_RECEIVER_APPLICATION_ID"
     }
   }
 }
@@ -66,6 +69,10 @@ await Chromecast.initialize({
 });
 
 await Chromecast.show();
+
+await Chromecast.loadMedia({
+  url: 'https://example.com/video.mp4',
+});
 ```
 
 ## iOS setup
@@ -91,6 +98,7 @@ If you use the full Bluetooth-enabled Google Cast SDK in your app setup, Google 
 
 * [`initialize(...)`](#initialize)
 * [`show()`](#show)
+* [`loadMedia(...)`](#loadmedia)
 * [`addListener('sessionStateChanged', ...)`](#addlistenersessionstatechanged-)
 * [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
@@ -109,7 +117,8 @@ initialize(options: InitializeOptions) => Promise<void>
 
 Initializes the native Google Cast SDK with your receiver application ID.
 
-Call this once during application startup, or configure the same value in Capacitor config.
+Call this once during application startup, or configure the same value in
+`capacitor.config.*` under `plugins.Chromecast.receiverApplicationId`.
 
 | Param         | Type                                                            |
 | ------------- | --------------------------------------------------------------- |
@@ -125,6 +134,21 @@ show() => Promise<void>
 ```
 
 Opens the official native Google Cast device picker.
+
+--------------------
+
+
+### loadMedia(...)
+
+```typescript
+loadMedia(options: LoadMediaOptions) => Promise<void>
+```
+
+Loads media from a URL on the currently connected Chromecast device.
+
+| Param         | Type                                                          |
+| ------------- | ------------------------------------------------------------- |
+| **`options`** | <code><a href="#loadmediaoptions">LoadMediaOptions</a></code> |
 
 --------------------
 
@@ -164,6 +188,13 @@ removeAllListeners() => Promise<void>
 | **`receiverApplicationId`** | <code>string</code> | Google Cast receiver application ID from the Google Cast Developer Console. This must be an 8-character hexadecimal application ID such as `CC1AD845`. |
 
 
+#### LoadMediaOptions
+
+| Prop      | Type                | Description                                                           |
+| --------- | ------------------- | --------------------------------------------------------------------- |
+| **`url`** | <code>string</code> | Absolute URL of the media to load on the connected Chromecast device. |
+
+
 #### PluginListenerHandle
 
 | Prop         | Type                                      |
@@ -187,7 +218,6 @@ removeAllListeners() => Promise<void>
 
 </docgen-api>
 
-
 ## Future media-casting capabilities
 
 The repository is structured so future Cast functionality can be added without breaking the simple `show()` API. Likely follow-up APIs include:
@@ -195,7 +225,6 @@ The repository is structured so future Cast functionality can be added without b
 - `isConnected()`
 - `getSession()`
 - `disconnect()`
-- `loadMedia()`
 - `play()`
 - `pause()`
 - `stop()`

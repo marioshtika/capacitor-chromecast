@@ -1,6 +1,7 @@
 package com.marioshtika.capacitorchromecast
 
 import android.content.Context
+import android.net.Uri
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +13,8 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.PluginMethod
+import com.google.android.gms.cast.MediaInfo
+import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
@@ -19,6 +22,10 @@ import com.google.android.gms.cast.framework.SessionManagerListener
 
 @CapacitorPlugin(name = "Chromecast")
 class ChromecastPlugin : Plugin() {
+    private class NotInitializedException(message: String) : IllegalStateException(message)
+
+    private class CastSessionNotConnectedException(message: String) : IllegalStateException(message)
+
     companion object {
         private const val EVENT_SESSION_STATE_CHANGED = "sessionStateChanged"
         private const val NOT_INITIALIZED_MESSAGE =
@@ -27,6 +34,10 @@ class ChromecastPlugin : Plugin() {
             "Google Cast is already initialized with a different receiver application ID. Restart the app before changing it."
         private const val CAST_NOT_AVAILABLE_MESSAGE =
             "The native Google Cast device picker is not currently available."
+        private const val INVALID_MEDIA_URL_MESSAGE =
+            "Media URL must be a valid absolute HTTP(S) URL."
+        private const val CAST_SESSION_NOT_CONNECTED_MESSAGE =
+            "No active Google Cast session is connected. Call Chromecast.show() and connect to a device first."
     }
 
     private var activeReceiverApplicationId: String? = null
@@ -92,7 +103,7 @@ class ChromecastPlugin : Plugin() {
             } catch (exception: IllegalArgumentException) {
                 call.reject(exception.message, "INVALID_RECEIVER_APPLICATION_ID")
             } catch (exception: IllegalStateException) {
-                val code = if (exception.message == NOT_INITIALIZED_MESSAGE) {
+                val code = if (exception is NotInitializedException) {
                     "NOT_INITIALIZED"
                 } else {
                     "CAST_CONNECTION_FAILED"
@@ -100,6 +111,78 @@ class ChromecastPlugin : Plugin() {
                 call.reject(exception.message, code)
             } catch (exception: Exception) {
                 call.reject("Failed to open the Google Cast device picker.", "CAST_NOT_AVAILABLE", exception)
+            }
+        }
+    }
+
+    @PluginMethod
+    fun loadMedia(call: PluginCall) {
+        val mediaUrl = call.getString("url")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && isSupportedMediaUrl(it) }
+
+        if (mediaUrl == null) {
+            call.reject(INVALID_MEDIA_URL_MESSAGE, "INVALID_MEDIA_URL")
+            return
+        }
+
+        val activity = activity
+        if (activity == null) {
+            call.reject(CAST_NOT_AVAILABLE_MESSAGE, "CAST_NOT_AVAILABLE")
+            return
+        }
+
+        activity.runOnUiThread {
+            try {
+                val receiverApplicationId = resolveReceiverApplicationIdForUse()
+                val resolvedCastContext = initializeCastContextIfNeeded(receiverApplicationId)
+                val currentCastSession = resolvedCastContext.sessionManager.currentCastSession
+                    ?: throw CastSessionNotConnectedException(CAST_SESSION_NOT_CONNECTED_MESSAGE)
+                val remoteMediaClient = currentCastSession.remoteMediaClient
+                    ?: throw CastSessionNotConnectedException(CAST_SESSION_NOT_CONNECTED_MESSAGE)
+
+                val mediaInfo = MediaInfo.Builder(mediaUrl)
+                    .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                    .build()
+                val loadRequestData = MediaLoadRequestData.Builder()
+                    .setMediaInfo(mediaInfo)
+                    .build()
+                val currentBridge = bridge
+                if (currentBridge == null) {
+                    call.reject(CAST_NOT_AVAILABLE_MESSAGE, "CAST_NOT_AVAILABLE")
+                    return@runOnUiThread
+                }
+                val loadRequest = remoteMediaClient.load(loadRequestData)
+                val callbackId = call.callbackId
+                currentBridge.saveCall(call)
+                loadRequest.setResultCallback { result ->
+                    val savedCall = currentBridge.getSavedCall(callbackId)
+                    if (savedCall == null) {
+                        currentBridge.releaseCall(callbackId)
+                        return@setResultCallback
+                    }
+
+                    if (result.status.isSuccess) {
+                        savedCall.resolve()
+                    } else {
+                        savedCall.reject("Failed to load media on the connected Google Cast device.", "MEDIA_LOAD_FAILED")
+                    }
+
+                    currentBridge.releaseCall(callbackId)
+                }
+            } catch (exception: IllegalArgumentException) {
+                call.reject(exception.message, "INVALID_RECEIVER_APPLICATION_ID")
+            } catch (exception: CastSessionNotConnectedException) {
+                call.reject(exception.message, "CAST_SESSION_NOT_CONNECTED")
+            } catch (exception: IllegalStateException) {
+                val code = if (exception is NotInitializedException) {
+                    "NOT_INITIALIZED"
+                } else {
+                    "CAST_CONNECTION_FAILED"
+                }
+                call.reject(exception.message, code)
+            } catch (exception: Exception) {
+                call.reject("Failed to load media on the connected Google Cast device.", "MEDIA_LOAD_FAILED", exception)
             }
         }
     }
@@ -170,7 +253,7 @@ class ChromecastPlugin : Plugin() {
         ChromecastConfiguration.getReceiverApplicationId(pluginContext)?.let { return it }
 
         val configuredReceiverApplicationId = resolveConfiguredReceiverApplicationId()
-            ?: throw IllegalStateException(NOT_INITIALIZED_MESSAGE)
+            ?: throw NotInitializedException(NOT_INITIALIZED_MESSAGE)
 
         ChromecastConfiguration.setReceiverApplicationId(pluginContext, configuredReceiverApplicationId)
         return configuredReceiverApplicationId
@@ -250,4 +333,13 @@ class ChromecastPlugin : Plugin() {
     }
 
     private fun pluginContext(): Context? = context ?: activity?.applicationContext
+
+    private fun isSupportedMediaUrl(value: String): Boolean {
+        return runCatching {
+            val parsedUri = Uri.parse(value)
+            val scheme = parsedUri.scheme?.lowercase()
+            val hasHost = !parsedUri.host.isNullOrBlank()
+            parsedUri.isAbsolute && hasHost && (scheme == "http" || scheme == "https")
+        }.getOrDefault(false)
+    }
 }

@@ -8,6 +8,7 @@ const { ChromecastWeb } = await import('../dist/esm/web.js');
 test('plugin import exposes initialize and show', () => {
   assert.equal(typeof Chromecast.initialize, 'function');
   assert.equal(typeof Chromecast.show, 'function');
+  assert.equal(typeof Chromecast.loadMedia, 'function');
 });
 
 test('initialize normalizes the receiver application ID and deduplicates repeats', async () => {
@@ -17,6 +18,7 @@ test('initialize normalizes the receiver application ID and deduplicates repeats
       initializeCalls.push(options);
     },
     async show() {},
+    async loadMedia() {},
     async addListener() {
       return {
         remove() {},
@@ -35,6 +37,7 @@ test('initialize rejects invalid receiver application IDs', async () => {
   const client = new ChromecastClient({
     async initialize() {},
     async show() {},
+    async loadMedia() {},
     async addListener() {
       return {
         remove() {},
@@ -56,6 +59,7 @@ test('show delegates to the native implementation', async () => {
     async show() {
       showCalls += 1;
     },
+    async loadMedia() {},
     async addListener() {
       return {
         remove() {},
@@ -67,6 +71,30 @@ test('show delegates to the native implementation', async () => {
   await client.show();
 
   assert.equal(showCalls, 1);
+});
+
+test('loadMedia delegates to the native implementation', async () => {
+  const loadMediaCalls = [];
+  const client = new ChromecastClient({
+    async initialize() {},
+    async show() {},
+    async loadMedia(options) {
+      loadMediaCalls.push(options);
+    },
+    async addListener() {
+      return {
+        remove() {},
+      };
+    },
+    async removeAllListeners() {},
+  });
+
+  const options = { url: 'https://example.com/video.mp4', metadata: { title: 'Video' } };
+
+  await client.loadMedia(options);
+
+  assert.equal(loadMediaCalls[0], options);
+  assert.deepEqual(loadMediaCalls, [options]);
 });
 
 test('web initialize reports unsupported platform', async () => {
@@ -85,6 +113,17 @@ test('web show reports unsupported platform', async () => {
 
   await assert.rejects(
     () => web.show(),
+    (error) =>
+      error.code === 'UNSUPPORTED_PLATFORM' &&
+      error.message === 'Chromecast is not supported on the web platform.',
+  );
+});
+
+test('web loadMedia reports unsupported platform', async () => {
+  const web = new ChromecastWeb();
+
+  await assert.rejects(
+    () => web.loadMedia({ url: 'https://example.com/video.mp4' }),
     (error) =>
       error.code === 'UNSUPPORTED_PLATFORM' &&
       error.message === 'Chromecast is not supported on the web platform.',

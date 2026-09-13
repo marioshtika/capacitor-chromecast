@@ -9,6 +9,13 @@ export interface InitializeOptions {
   receiverApplicationId: string;
 }
 
+export interface LoadMediaOptions {
+  /**
+   * Absolute URL of the media to load on the connected Chromecast device.
+   */
+  url: string;
+}
+
 export type SessionState = 'connecting' | 'connected' | 'disconnected';
 
 export interface SessionStateChangedEvent {
@@ -28,6 +35,11 @@ export interface ChromecastPlugin {
    * Opens the official native Google Cast device picker.
    */
   show(): Promise<void>;
+
+  /**
+   * Loads media from a URL on the currently connected Chromecast device.
+   */
+  loadMedia(options: LoadMediaOptions): Promise<void>;
 
   addListener(
     eventName: 'sessionStateChanged',

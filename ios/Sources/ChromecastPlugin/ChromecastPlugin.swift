@@ -7,7 +7,8 @@ public class ChromecastPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "Chromecast"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "initialize", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "loadMedia", returnType: CAPPluginReturnPromise)
     ]
 
     private let implementation = Chromecast()
@@ -50,6 +51,27 @@ public class ChromecastPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject(error.message, error.code)
             } catch {
                 call.reject("Failed to open the Google Cast device picker.", ChromecastPluginError.castNotAvailable.code, error)
+            }
+        }
+    }
+
+    @objc func loadMedia(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            do {
+                try self.implementation.loadMedia(
+                    url: call.getString("url") ?? "",
+                    configuredReceiverApplicationId: self.getConfig().getString("receiverApplicationId")
+                ) { error in
+                    guard let error else {
+                        call.resolve()
+                        return
+                    }
+                    call.reject(error.message, error.code)
+                }
+            } catch let error as ChromecastPluginError {
+                call.reject(error.message, error.code)
+            } catch {
+                call.reject(ChromecastPluginError.mediaLoadFailed.message, ChromecastPluginError.mediaLoadFailed.code, error)
             }
         }
     }

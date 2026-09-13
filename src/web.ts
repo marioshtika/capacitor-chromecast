@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { ChromecastPlugin, InitializeOptions } from './definitions.js';
+import type { ChromecastPlugin, InitializeOptions, LoadMediaOptions } from './definitions.js';
 import { createChromecastError, normalizeReceiverApplicationId } from './errors.js';
 
 const unsupportedPlatformError = () =>
@@ -13,6 +13,11 @@ export class ChromecastWeb extends WebPlugin implements ChromecastPlugin {
   }
 
   async show(): Promise<void> {
+    throw unsupportedPlatformError();
+  }
+
+  async loadMedia(options: LoadMediaOptions): Promise<void> {
+    void options;
     throw unsupportedPlatformError();
   }
 }

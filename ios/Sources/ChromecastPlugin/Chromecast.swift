@@ -5,8 +5,11 @@ import UIKit
 enum ChromecastPluginError: String, Error {
     case notInitialized = "NOT_INITIALIZED"
     case invalidReceiverApplicationId = "INVALID_RECEIVER_APPLICATION_ID"
+    case invalidMediaUrl = "INVALID_MEDIA_URL"
     case castNotAvailable = "CAST_NOT_AVAILABLE"
     case castConnectionFailed = "CAST_CONNECTION_FAILED"
+    case castSessionNotConnected = "CAST_SESSION_NOT_CONNECTED"
+    case mediaLoadFailed = "MEDIA_LOAD_FAILED"
     case unsupportedPlatform = "UNSUPPORTED_PLATFORM"
 
     var code: String {
@@ -19,10 +22,16 @@ enum ChromecastPluginError: String, Error {
             return "Google Cast has not been initialized. Call Chromecast.initialize(...) or configure plugins.Chromecast.receiverApplicationId in capacitor.config.*."
         case .invalidReceiverApplicationId:
             return "Receiver application ID must be an 8-character hexadecimal Google Cast receiver application ID."
+        case .invalidMediaUrl:
+            return "Media URL must be a valid absolute HTTP(S) URL."
         case .castNotAvailable:
             return "The native Google Cast device picker is not currently available."
         case .castConnectionFailed:
             return "Google Cast is already initialized with a different receiver application ID. Restart the app before changing it."
+        case .castSessionNotConnected:
+            return "No active Google Cast session is connected. Call Chromecast.show() and connect to a device first."
+        case .mediaLoadFailed:
+            return "Failed to load media on the connected Google Cast device."
         case .unsupportedPlatform:
             return "Chromecast is not supported on the web platform."
         }
@@ -39,6 +48,7 @@ final class Chromecast: NSObject, GCKSessionManagerListener {
     private let userDefaults: UserDefaults
     private var activeReceiverApplicationId: String?
     private var sessionListenerAttached = false
+    private var mediaLoadRequestDelegates: [Int: MediaLoadRequestDelegate] = [:]
 
     var sessionStateChangedHandler: ((String) -> Void)?
 
@@ -84,6 +94,57 @@ final class Chromecast: NSObject, GCKSessionManagerListener {
         castButton.sendActions(for: .touchUpInside)
     }
 
+    func loadMedia(
+        url: String,
+        configuredReceiverApplicationId: String?,
+        completion: @escaping (ChromecastPluginError?) -> Void
+    ) throws {
+        let trimmedUrl = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            let mediaUrl = URL(string: trimmedUrl),
+            let scheme = mediaUrl.scheme?.lowercased(),
+            let host = mediaUrl.host,
+            !host.isEmpty,
+            (scheme == "http" || scheme == "https")
+        else {
+            throw ChromecastPluginError.invalidMediaUrl
+        }
+
+        let receiverApplicationId = try resolveReceiverApplicationId(configuredReceiverApplicationId: configuredReceiverApplicationId)
+        guard let receiverApplicationId else {
+            throw ChromecastPluginError.notInitialized
+        }
+
+        try initializeCastContextIfNeeded(receiverApplicationId: receiverApplicationId)
+
+        guard
+            GCKCastContext.isSharedInstanceInitialized(),
+            let currentCastSession = GCKCastContext.sharedInstance().sessionManager.currentCastSession,
+            let remoteMediaClient = currentCastSession.remoteMediaClient
+        else {
+            throw ChromecastPluginError.castSessionNotConnected
+        }
+
+        let mediaInformationBuilder = GCKMediaInformationBuilder(contentURL: mediaUrl)
+        mediaInformationBuilder.streamType = .buffered
+
+        let requestDataBuilder = GCKMediaLoadRequestDataBuilder()
+        requestDataBuilder.mediaInformation = mediaInformationBuilder.build()
+        let request = remoteMediaClient.loadMedia(with: requestDataBuilder.build())
+        let requestIdentifier = Int(request.requestID)
+
+        guard requestIdentifier != Int(kGCKInvalidRequestID) else {
+            throw ChromecastPluginError.mediaLoadFailed
+        }
+
+        let delegate = MediaLoadRequestDelegate { [weak self] error in
+            self?.mediaLoadRequestDelegates.removeValue(forKey: requestIdentifier)
+            completion(error)
+        }
+        mediaLoadRequestDelegates[requestIdentifier] = delegate
+        request.delegate = delegate
+    }
+
     static func validateReceiverApplicationId(_ value: String?) throws -> String {
         let normalizedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
         let fullRange = NSRange(location: 0, length: normalizedValue.utf16.count)
@@ -101,6 +162,22 @@ final class Chromecast: NSObject, GCKSessionManagerListener {
             let normalizedReceiverApplicationId = try Self.validateReceiverApplicationId(configuredReceiverApplicationId)
             storeReceiverApplicationId(normalizedReceiverApplicationId)
             return normalizedReceiverApplicationId
+        }
+
+        private final class MediaLoadRequestDelegate: NSObject, GCKRequestDelegate {
+            private let completion: (ChromecastPluginError?) -> Void
+
+            init(completion: @escaping (ChromecastPluginError?) -> Void) {
+                self.completion = completion
+            }
+
+            func requestDidComplete(_ request: GCKRequest) {
+                completion(nil)
+            }
+
+            func request(_ request: GCKRequest, didFailWithError error: GCKError) {
+                completion(.mediaLoadFailed)
+            }
         }
 
         guard let storedReceiverApplicationId = userDefaults.string(forKey: Constants.receiverApplicationIdKey) else {
