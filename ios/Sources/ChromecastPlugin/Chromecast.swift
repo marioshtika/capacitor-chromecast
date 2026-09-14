@@ -145,6 +145,18 @@ final class Chromecast: NSObject, GCKSessionManagerListener {
         request.delegate = delegate
     }
 
+    func isConnected(configuredReceiverApplicationId: String?) throws -> Bool {
+        if let receiverApplicationId = try resolveReceiverApplicationId(configuredReceiverApplicationId: configuredReceiverApplicationId) {
+            try initializeCastContextIfNeeded(receiverApplicationId: receiverApplicationId)
+        }
+
+        guard GCKCastContext.isSharedInstanceInitialized() else {
+            return false
+        }
+
+        return GCKCastContext.sharedInstance().sessionManager.currentCastSession != nil
+    }
+
     static func validateReceiverApplicationId(_ value: String?) throws -> String {
         let normalizedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
         let fullRange = NSRange(location: 0, length: normalizedValue.utf16.count)

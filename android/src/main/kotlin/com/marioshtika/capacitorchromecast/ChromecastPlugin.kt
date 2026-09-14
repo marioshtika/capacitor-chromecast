@@ -187,6 +187,34 @@ class ChromecastPlugin : Plugin() {
         }
     }
 
+    @PluginMethod
+    fun isConnected(call: PluginCall) {
+        val activity = activity
+        if (activity == null) {
+            call.reject(CAST_NOT_AVAILABLE_MESSAGE, "CAST_NOT_AVAILABLE")
+            return
+        }
+
+        activity.runOnUiThread {
+            try {
+                resolveConfiguredReceiverApplicationId()?.let { receiverApplicationId ->
+                    initializeCastContextIfNeeded(receiverApplicationId)
+                }
+
+                val result = JSObject().apply {
+                    put("isConnected", castContext?.sessionManager?.currentCastSession != null)
+                }
+                call.resolve(result)
+            } catch (exception: IllegalArgumentException) {
+                call.reject(exception.message, "INVALID_RECEIVER_APPLICATION_ID")
+            } catch (exception: IllegalStateException) {
+                call.reject(exception.message, "CAST_CONNECTION_FAILED")
+            } catch (exception: Exception) {
+                call.reject("Failed to check the Google Cast connection status.", "CAST_CONNECTION_FAILED", exception)
+            }
+        }
+    }
+
     override fun handleOnDestroy() {
         detachSessionManagerListener()
         super.handleOnDestroy()
