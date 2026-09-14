@@ -87,7 +87,7 @@ public class ChromecastPlugin: CAPPlugin, CAPBridgedPlugin {
             } catch let error as ChromecastPluginError {
                 call.reject(error.message, error.code)
             } catch {
-                call.reject("Failed to check the Google Cast connection status.", ChromecastPluginError.castConnectionFailed.code, error)
+                call.reject("Failed to check the Google Cast connection status.", ChromecastPluginError.castNotAvailable.code, error)
             }
         }
     }
