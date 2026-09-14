@@ -41,6 +41,11 @@ export interface ChromecastPlugin {
    */
   loadMedia(options: LoadMediaOptions): Promise<void>;
 
+  /**
+   * Returns whether there is an active Chromecast device connection.
+   */
+  isConnected(): Promise<boolean>;
+
   addListener(
     eventName: 'sessionStateChanged',
     listenerFunc: (event: SessionStateChangedEvent) => void,

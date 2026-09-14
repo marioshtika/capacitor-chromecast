@@ -8,6 +8,7 @@ type NativeChromecastPlugin = {
   initialize(options: InitializeOptions): Promise<void>;
   show(): Promise<void>;
   loadMedia(options: LoadMediaOptions): Promise<void>;
+  isConnected(): Promise<{ isConnected: boolean }>;
   addListener(
     eventName: 'sessionStateChanged',
     listenerFunc: (event: SessionStateChangedEvent) => void,
@@ -59,6 +60,11 @@ export class ChromecastClient implements ChromecastPlugin {
 
   async loadMedia(options: LoadMediaOptions): Promise<void> {
     await this.plugin.loadMedia(options);
+  }
+
+  async isConnected(): Promise<boolean> {
+    const { isConnected } = await this.plugin.isConnected();
+    return isConnected;
   }
 
   addListener(

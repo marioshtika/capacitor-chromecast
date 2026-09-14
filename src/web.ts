@@ -20,4 +20,8 @@ export class ChromecastWeb extends WebPlugin implements ChromecastPlugin {
     void options;
     throw unsupportedPlatformError();
   }
+
+  async isConnected(): Promise<boolean> {
+    throw unsupportedPlatformError();
+  }
 }

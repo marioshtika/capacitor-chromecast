@@ -9,6 +9,7 @@ test('plugin import exposes initialize and show', () => {
   assert.equal(typeof Chromecast.initialize, 'function');
   assert.equal(typeof Chromecast.show, 'function');
   assert.equal(typeof Chromecast.loadMedia, 'function');
+  assert.equal(typeof Chromecast.isConnected, 'function');
 });
 
 test('initialize normalizes the receiver application ID and deduplicates repeats', async () => {
@@ -19,6 +20,9 @@ test('initialize normalizes the receiver application ID and deduplicates repeats
     },
     async show() {},
     async loadMedia() {},
+    async isConnected() {
+      return { isConnected: false };
+    },
     async addListener() {
       return {
         remove() {},
@@ -38,6 +42,9 @@ test('initialize rejects invalid receiver application IDs', async () => {
     async initialize() {},
     async show() {},
     async loadMedia() {},
+    async isConnected() {
+      return { isConnected: false };
+    },
     async addListener() {
       return {
         remove() {},
@@ -60,6 +67,9 @@ test('show delegates to the native implementation', async () => {
       showCalls += 1;
     },
     async loadMedia() {},
+    async isConnected() {
+      return { isConnected: false };
+    },
     async addListener() {
       return {
         remove() {},
@@ -81,6 +91,9 @@ test('loadMedia delegates to the native implementation', async () => {
     async loadMedia(options) {
       loadMediaCalls.push(options);
     },
+    async isConnected() {
+      return { isConnected: false };
+    },
     async addListener() {
       return {
         remove() {},
@@ -95,6 +108,30 @@ test('loadMedia delegates to the native implementation', async () => {
 
   assert.equal(loadMediaCalls[0], options);
   assert.deepEqual(loadMediaCalls, [options]);
+});
+
+test('isConnected delegates to the native implementation', async () => {
+  let isConnectedCalls = 0;
+  const client = new ChromecastClient({
+    async initialize() {},
+    async show() {},
+    async loadMedia() {},
+    async isConnected() {
+      isConnectedCalls += 1;
+      return { isConnected: true };
+    },
+    async addListener() {
+      return {
+        remove() {},
+      };
+    },
+    async removeAllListeners() {},
+  });
+
+  const isConnected = await client.isConnected();
+
+  assert.equal(isConnectedCalls, 1);
+  assert.equal(isConnected, true);
 });
 
 test('web initialize reports unsupported platform', async () => {
@@ -124,6 +161,17 @@ test('web loadMedia reports unsupported platform', async () => {
 
   await assert.rejects(
     () => web.loadMedia({ url: 'https://example.com/video.mp4' }),
+    (error) =>
+      error.code === 'UNSUPPORTED_PLATFORM' &&
+      error.message === 'Chromecast is not supported on the web platform.',
+  );
+});
+
+test('web isConnected reports unsupported platform', async () => {
+  const web = new ChromecastWeb();
+
+  await assert.rejects(
+    () => web.isConnected(),
     (error) =>
       error.code === 'UNSUPPORTED_PLATFORM' &&
       error.message === 'Chromecast is not supported on the web platform.',

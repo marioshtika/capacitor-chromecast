@@ -8,7 +8,8 @@ public class ChromecastPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "initialize", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "loadMedia", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "loadMedia", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isConnected", returnType: CAPPluginReturnPromise)
     ]
 
     private let implementation = Chromecast()
@@ -72,6 +73,21 @@ public class ChromecastPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject(error.message, error.code)
             } catch {
                 call.reject(ChromecastPluginError.mediaLoadFailed.message, ChromecastPluginError.mediaLoadFailed.code, error)
+            }
+        }
+    }
+
+    @objc func isConnected(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            do {
+                let isConnected = try self.implementation.isConnected(
+                    configuredReceiverApplicationId: self.getConfig().getString("receiverApplicationId")
+                )
+                call.resolve(["isConnected": isConnected])
+            } catch let error as ChromecastPluginError {
+                call.reject(error.message, error.code)
+            } catch {
+                call.reject("Failed to check the Google Cast connection status.", ChromecastPluginError.castConnectionFailed.code, error)
             }
         }
     }
